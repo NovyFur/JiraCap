@@ -47,11 +47,24 @@ export class JiraService {
     };
   }
 
+  // Helper to handle Proxy URL construction
+  private async fetchFromJira(endpoint: string): Promise<Response> {
+    const targetUrl = `${this.baseUrl}${endpoint}`;
+    
+    // If proxy is enabled, wrap the URL
+    // We use corsproxy.io as it is a common stable public proxy for demos
+    const finalUrl = this.config.useProxy 
+      ? `https://corsproxy.io/?${encodeURIComponent(targetUrl)}` 
+      : targetUrl;
+
+    return fetch(finalUrl, {
+      headers: this.headers
+    });
+  }
+
   async validateConnection(): Promise<boolean> {
     try {
-      const response = await fetch(`${this.baseUrl}/rest/api/3/myself`, {
-        headers: this.headers
-      });
+      const response = await this.fetchFromJira('/rest/api/3/myself');
       return response.ok;
     } catch (e) {
       console.error("Jira connection validation failed", e);
@@ -60,18 +73,15 @@ export class JiraService {
   }
 
   async getProjectDetails() {
-    const response = await fetch(`${this.baseUrl}/rest/api/3/project/${this.config.projectKey}`, {
-      headers: this.headers
-    });
+    const response = await this.fetchFromJira(`/rest/api/3/project/${this.config.projectKey}`);
     if (!response.ok) throw new Error(`Failed to fetch project: ${response.statusText}`);
     return response.json();
   }
 
   async getTeamMembers(): Promise<TeamMember[]> {
     // Fetch assignable users for the project
-    const response = await fetch(
-      `${this.baseUrl}/rest/api/3/user/assignable/search?project=${this.config.projectKey}`, 
-      { headers: this.headers }
+    const response = await this.fetchFromJira(
+      `/rest/api/3/user/assignable/search?project=${this.config.projectKey}`
     );
     
     if (!response.ok) throw new Error("Failed to fetch users");
@@ -92,9 +102,8 @@ export class JiraService {
   async getSprints(): Promise<Sprint[]> {
     // First we need to find the board for the project. This is a heuristic.
     // We search for boards with the project name or key.
-    const boardResp = await fetch(
-      `${this.baseUrl}/rest/agile/1.0/board?projectKeyOrId=${this.config.projectKey}`,
-      { headers: this.headers }
+    const boardResp = await this.fetchFromJira(
+      `/rest/agile/1.0/board?projectKeyOrId=${this.config.projectKey}`
     );
     
     if (!boardResp.ok) throw new Error("Failed to fetch boards");
@@ -105,9 +114,8 @@ export class JiraService {
     // Use the first board found
     const boardId = boardData.values[0].id;
 
-    const sprintResp = await fetch(
-      `${this.baseUrl}/rest/agile/1.0/board/${boardId}/sprint?state=active,future`,
-      { headers: this.headers }
+    const sprintResp = await this.fetchFromJira(
+      `/rest/agile/1.0/board/${boardId}/sprint?state=active,future`
     );
 
     if (!sprintResp.ok) throw new Error("Failed to fetch sprints");
@@ -124,9 +132,8 @@ export class JiraService {
 
   async getIssues(): Promise<JiraIssue[]> {
     const jql = `project = ${this.config.projectKey} AND statusCategory != Done ORDER BY rank`;
-    const response = await fetch(
-      `${this.baseUrl}/rest/api/3/search?jql=${encodeURIComponent(jql)}&maxResults=100&fields=summary,status,priority,issuetype,assignee,customfield_10016,sprint`, 
-      { headers: this.headers }
+    const response = await this.fetchFromJira(
+      `/rest/api/3/search?jql=${encodeURIComponent(jql)}&maxResults=100&fields=summary,status,priority,issuetype,assignee,customfield_10016,sprint`
     );
 
     if (!response.ok) throw new Error("Failed to fetch issues");

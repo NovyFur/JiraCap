@@ -68,6 +68,7 @@ export interface JiraConfig {
   email: string;
   apiToken: string;
   projectKey: string;
+  useProxy?: boolean;
 }
 
 export enum ViewMode {

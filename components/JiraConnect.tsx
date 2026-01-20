@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Button } from './Button';
 import { JiraConfig } from '../types';
-import { Link, Lock, Globe, Mail, Box } from 'lucide-react';
+import { Link, Lock, Globe, Mail, Box, ShieldCheck } from 'lucide-react';
 
 interface JiraConnectProps {
   onConnect: (config: JiraConfig) => Promise<boolean>;
@@ -14,7 +14,8 @@ export const JiraConnect: React.FC<JiraConnectProps> = ({ onConnect, isLoading, 
     domain: 'https://your-domain.atlassian.net',
     email: '',
     apiToken: '',
-    projectKey: ''
+    projectKey: '',
+    useProxy: true
   });
   const [error, setError] = useState<string | null>(null);
 
@@ -23,7 +24,7 @@ export const JiraConnect: React.FC<JiraConnectProps> = ({ onConnect, isLoading, 
     setError(null);
     const success = await onConnect(config);
     if (!success) {
-      setError("Connection failed. Please check your credentials and ensure CORS is allowed (or use a proxy).");
+      setError("Connection failed. Check credentials, project key, or try toggling the CORS Proxy.");
     }
   };
 
@@ -39,7 +40,7 @@ export const JiraConnect: React.FC<JiraConnectProps> = ({ onConnect, isLoading, 
 
       <form onSubmit={handleSubmit} className="p-6 space-y-4">
         {error && (
-          <div className="p-3 bg-red-50 text-red-600 text-sm rounded-lg">
+          <div className="p-3 bg-red-50 text-red-600 text-sm rounded-lg border border-red-100">
             {error}
           </div>
         )}
@@ -107,6 +108,29 @@ export const JiraConnect: React.FC<JiraConnectProps> = ({ onConnect, isLoading, 
           </div>
         </div>
 
+        <div className="p-3 bg-blue-50 rounded-lg border border-blue-100">
+          <label className="flex items-start gap-3 cursor-pointer">
+            <div className="pt-0.5 text-blue-600">
+              <ShieldCheck size={18} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                 <input
+                  type="checkbox"
+                  checked={config.useProxy}
+                  onChange={(e) => setConfig({ ...config, useProxy: e.target.checked })}
+                  className="rounded border-blue-300 text-blue-600 focus:ring-blue-500 mt-0.5"
+                />
+                <span className="text-sm font-medium text-blue-900">Use CORS Proxy</span>
+              </div>
+              <p className="text-xs text-blue-700 mt-1">
+                Required for browser-only connections. Routes requests via a public proxy (corsproxy.io). 
+                Disable if you use a browser extension or VPN.
+              </p>
+            </div>
+          </label>
+        </div>
+
         <div className="pt-2 flex gap-3">
           <Button type="button" variant="ghost" onClick={onCancel} className="flex-1">
             Cancel
@@ -115,10 +139,6 @@ export const JiraConnect: React.FC<JiraConnectProps> = ({ onConnect, isLoading, 
             {isLoading ? 'Connecting...' : 'Connect Project'}
           </Button>
         </div>
-        
-        <p className="text-xs text-slate-400 text-center mt-4">
-          Note: You may need a CORS extension enabled in your browser for direct API calls to Atlassian.
-        </p>
       </form>
     </div>
   );
