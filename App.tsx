@@ -14,7 +14,7 @@ import { analyzeCapacity, generateSampleData } from './services/geminiService';
 import { JiraService } from './services/jiraService';
 import { 
   LayoutDashboard, Calendar, Users, 
-  Sparkles, RefreshCw, Database, Plug
+  Sparkles, RefreshCw, Database, Plug, LogOut
 } from 'lucide-react';
 
 function App() {
@@ -28,6 +28,7 @@ function App() {
   const [showJiraModal, setShowJiraModal] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
+  const [projectKey, setProjectKey] = useState<string>("");
 
   // AI State
   const [analysis, setAnalysis] = useState<GeminiAnalysisResult | null>(null);
@@ -52,6 +53,7 @@ function App() {
       setTeam(fetchedTeam);
       setSprints(fetchedSprints);
       setIssues(fetchedIssues);
+      setProjectKey(config.projectKey);
       setIsConnected(true);
       setShowJiraModal(false);
       return true;
@@ -68,8 +70,19 @@ function App() {
     setTeam(data.team);
     setSprints(data.sprints);
     setIssues(data.issues);
+    setProjectKey("MANUAL-IMPORT");
     setIsConnected(true);
     setShowJiraModal(false);
+  };
+
+  const handleDisconnect = () => {
+    setIsConnected(false);
+    setTeam(INITIAL_TEAM);
+    setIssues(MOCK_ISSUES);
+    setSprints(INITIAL_SPRINTS);
+    setProjectKey("");
+    // Optionally clear analysis results as they might be stale
+    setAnalysis(null);
   };
 
   // AI Analysis Handler
@@ -189,9 +202,26 @@ function App() {
                 </Button>
               </div>
            ) : (
-             <div className="flex items-center gap-2 px-2 text-sm text-green-700">
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                Jira Connected
+             <div className="bg-white p-3 rounded-lg border border-green-200 shadow-sm">
+               <div className="flex items-center justify-between mb-2">
+                 <div className="flex items-center gap-2 text-sm font-medium text-slate-900">
+                    <div className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                    </div>
+                    Jira Connected
+                 </div>
+                 <button 
+                    onClick={handleDisconnect}
+                    className="text-slate-400 hover:text-red-500 transition-colors p-1 rounded-md hover:bg-red-50"
+                    title="Disconnect Project"
+                 >
+                   <LogOut size={15} />
+                 </button>
+               </div>
+               <p className="text-xs text-slate-500 truncate" title={projectKey}>
+                 Project: {projectKey}
+               </p>
              </div>
            )}
            
@@ -216,15 +246,17 @@ function App() {
           </div>
 
           <div className="flex items-center gap-3">
-            <Button 
-              variant="secondary" 
-              icon={<RefreshCw size={16} className={isGenerating ? "animate-spin" : ""} />}
-              onClick={handleGenerateData}
-              disabled={isGenerating || isConnected}
-              title="Generate Mock Data"
-            >
-              Generate Data
-            </Button>
+            {!isConnected && (
+              <Button 
+                variant="secondary" 
+                icon={<RefreshCw size={16} className={isGenerating ? "animate-spin" : ""} />}
+                onClick={handleGenerateData}
+                disabled={isGenerating}
+                title="Generate Mock Data"
+              >
+                Generate Data
+              </Button>
+            )}
             <Button 
               variant="primary" 
               icon={<Sparkles size={16} />}
