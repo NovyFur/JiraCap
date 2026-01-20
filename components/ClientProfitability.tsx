@@ -2,13 +2,12 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { JiraIssue } from '../types';
 import { 
   ScatterChart, Scatter, XAxis, YAxis, ZAxis, CartesianGrid, Tooltip, 
-  ResponsiveContainer, ReferenceLine, Cell, Legend
+  ResponsiveContainer, ReferenceLine, Cell
 } from 'recharts';
 import { 
-  DollarSign, TrendingUp, AlertOctagon, Briefcase, Settings2, 
-  Target, Info 
+  DollarSign, AlertOctagon, Briefcase, Settings2, 
+  Info 
 } from 'lucide-react';
-import { Button } from './Button';
 
 interface ClientProfitabilityProps {
   issues: JiraIssue[];
@@ -45,7 +44,7 @@ export const ClientProfitability: React.FC<ClientProfitabilityProps> = ({ issues
   };
 
   // Aggregation Logic
-  const clientData = useMemo(() => {
+  const clientData: ClientData[] = useMemo(() => {
     const groups: Record<string, { name: string; seconds: number }> = {};
 
     issues.forEach(issue => {
