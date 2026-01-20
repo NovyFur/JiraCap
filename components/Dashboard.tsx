@@ -1,10 +1,10 @@
 import React, { useMemo } from 'react';
 import { JiraIssue, TeamMember, Sprint, Status } from '../types';
 import { 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, 
+  Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, 
   PieChart, Pie, Cell, ComposedChart, Line, ReferenceLine 
 } from 'recharts';
-import { AlertCircle, CheckCircle2, Clock, Users, Flame, TrendingUp, AlertTriangle } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Clock, Users, Flame, TrendingUp, AlertTriangle, Activity } from 'lucide-react';
 
 interface DashboardProps {
   issues: JiraIssue[];
@@ -64,6 +64,28 @@ export const Dashboard: React.FC<DashboardProps> = ({ issues, team, sprints }) =
       };
     }).sort((a, b) => b.rawUtilization - a.rawUtilization); // Sort by highest utilization
   }, [issues, team, activeSprint]);
+
+  const forecastData = useMemo(() => {
+    // Ensure sprints are sorted by date
+    const sortedSprints = [...sprints].sort((a, b) => 
+      new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
+    );
+
+    const totalTeamCapacity = team.reduce((acc, t) => acc + t.capacityPerSprint, 0);
+
+    return sortedSprints.map(sprint => {
+      const sprintLoad = issues
+        .filter(i => i.sprintId === sprint.id)
+        .reduce((acc, i) => acc + (i.storyPoints || 0), 0);
+      
+      return {
+        name: sprint.name,
+        capacity: totalTeamCapacity,
+        workload: sprintLoad,
+        isBreach: sprintLoad > totalTeamCapacity
+      };
+    });
+  }, [sprints, issues, team]);
 
   const atRiskMembers = burnoutData.filter(d => d.isRisk);
 
@@ -227,6 +249,80 @@ export const Dashboard: React.FC<DashboardProps> = ({ issues, team, sprints }) =
                   ))}
               </Bar>
               <Line type="monotone" dataKey="realization" name="Realization (Done/Assigned)" stroke="#3b82f6" strokeWidth={3} dot={{ r: 4, fill: "#3b82f6", strokeWidth: 2, stroke: "#fff" }} />
+            </ComposedChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* Capacity Forecast Chart */}
+      <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
+              <Activity size={20} />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-slate-900">Capacity Forecast</h3>
+              <p className="text-sm text-slate-500">Projected workload vs. total team capacity</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-4 text-xs">
+              <div className="flex items-center gap-2">
+                  <div className="w-5 h-0.5 bg-red-500 border-t-2 border-dashed border-red-500"></div>
+                  <span className="text-slate-600 font-medium">Capacity Threshold</span>
+              </div>
+              <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 bg-blue-600 rounded-full"></div>
+                  <span className="text-slate-600 font-medium">Projected Workload</span>
+              </div>
+          </div>
+        </div>
+        
+        <div className="h-[300px] w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <ComposedChart data={forecastData} margin={{ top: 10, right: 30, left: 20, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+              <XAxis dataKey="name" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
+              <YAxis stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} label={{ value: 'Story Points', angle: -90, position: 'insideLeft', style: { fill: '#94a3b8' } }} />
+              <Tooltip 
+                  contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                  cursor={{ stroke: '#cbd5e1', strokeDasharray: '4 4' }}
+              />
+              {/* Capacity Threshold Line */}
+              <Line 
+                  type="step" 
+                  dataKey="capacity" 
+                  name="Total Capacity"
+                  stroke="#ef4444" 
+                  strokeWidth={2} 
+                  strokeDasharray="5 5" 
+                  dot={false} 
+                  activeDot={false}
+              />
+              {/* Workload Line */}
+              <Line 
+                  type="monotone" 
+                  dataKey="workload" 
+                  name="Planned Workload"
+                  stroke="#2563eb" 
+                  strokeWidth={3} 
+                  dot={(props: any) => {
+                      // Custom dot that turns red if breaching
+                      const { cx, cy, payload } = props;
+                      const isBreach = payload.workload > payload.capacity;
+                      return (
+                        <circle 
+                          cx={cx} 
+                          cy={cy} 
+                          r={4} 
+                          stroke="#fff" 
+                          strokeWidth={2} 
+                          fill={isBreach ? "#ef4444" : "#2563eb"} 
+                        />
+                      );
+                  }}
+                  activeDot={{ r: 6 }}
+              />
             </ComposedChart>
           </ResponsiveContainer>
         </div>
