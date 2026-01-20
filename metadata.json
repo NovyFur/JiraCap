@@ -1,0 +1,5 @@
+{
+  "name": "JiraCap - Intelligent Capacity Planner",
+  "description": "A comprehensive capacity planning tool for Project Managers and SysOps. Integrates with Jira to visualize team workload, forecast bottlenecks, and optimize resource allocation using Gemini AI.",
+  "requestFramePermissions": []
+}
