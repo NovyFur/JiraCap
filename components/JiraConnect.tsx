@@ -94,9 +94,13 @@ export const JiraConnect: React.FC<JiraConnectProps> = ({ onConnect, onManualImp
   const getSearchUrl = () => {
     const baseUrl = manualDomain.replace(/\/$/, '');
     const jql = `project = ${manualProjectKey} AND statusCategory != Done ORDER BY rank`;
-    // We use API v2 here for the browser link because it supports GET parameters in the URL bar easily.
-    // API v3 requires POST for search, which is hard to trigger via a simple link click.
-    return `${baseUrl}/rest/api/2/search?jql=${encodeURIComponent(jql)}&maxResults=100&fields=summary,status,priority,issuetype,assignee,customfield_10016`;
+    // Update to use the new /rest/api/3/search/jql endpoint as per API changes
+    const params = new URLSearchParams();
+    params.append('jql', jql);
+    params.append('maxResults', '100');
+    params.append('fields', 'summary,status,priority,issuetype,assignee,customfield_10016');
+    
+    return `${baseUrl}/rest/api/3/search/jql?${params.toString()}`;
   };
 
   return (

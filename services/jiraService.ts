@@ -68,7 +68,6 @@ export class JiraService {
     }
 
     // Proxy fallback strategy
-    // Note: Some proxies don't handle POST bodies well, but these usually do.
     const proxies = [
       (u: string) => `https://corsproxy.io/?${encodeURIComponent(u)}`,
       (u: string) => `https://thingproxy.freeboard.io/fetch/${u}`
@@ -158,15 +157,18 @@ export class JiraService {
   async getIssues(): Promise<JiraIssue[]> {
     const jql = `project = "${this.config.projectKey}" AND statusCategory != Done ORDER BY rank`;
     
-    // MANDATORY FIX: Use POST /rest/api/3/search
-    // GET /rest/api/3/search is deprecated/removed.
-    const response = await this.fetchFromJira('/rest/api/3/search', {
-      method: 'POST',
-      body: JSON.stringify({
-        jql,
-        maxResults: 100,
-        fields: ['summary', 'status', 'priority', 'issuetype', 'assignee', 'customfield_10016', 'sprint']
-      })
+    // Explicitly using GET /rest/api/3/search/jql as requested by the deprecation notice.
+    // This new endpoint replaces GET /rest/api/3/search.
+    // Using GET is preferred here to minimize issues with proxies that might mishandle POST bodies.
+    const fields = ['summary', 'status', 'priority', 'issuetype', 'assignee', 'customfield_10016', 'sprint'];
+    
+    const params = new URLSearchParams();
+    params.append('jql', jql);
+    params.append('maxResults', '100');
+    params.append('fields', fields.join(','));
+
+    const response = await this.fetchFromJira(`/rest/api/3/search/jql?${params.toString()}`, {
+      method: 'GET'
     });
 
     if (!response.ok) {
