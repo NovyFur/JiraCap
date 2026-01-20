@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   JiraIssue, TeamMember, Sprint, ViewMode, GeminiAnalysisResult, JiraConfig 
 } from './types';
@@ -17,24 +17,56 @@ import {
   Sparkles, RefreshCw, Database, Plug, LogOut
 } from 'lucide-react';
 
+const STORAGE_KEY = 'jiracap_workspace_v1';
+
 function App() {
+  // Load saved state helper
+  const getSavedState = () => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      return saved ? JSON.parse(saved) : null;
+    } catch (e) {
+      console.error('Failed to load saved state:', e);
+      return null;
+    }
+  };
+
+  const savedState = getSavedState();
+
   // Application State
   const [view, setView] = useState<ViewMode>(ViewMode.DASHBOARD);
-  const [team, setTeam] = useState<TeamMember[]>(INITIAL_TEAM);
-  const [issues, setIssues] = useState<JiraIssue[]>(MOCK_ISSUES);
-  const [sprints, setSprints] = useState<Sprint[]>(INITIAL_SPRINTS);
+  
+  // Initialize with saved data if connected, otherwise use defaults
+  const [team, setTeam] = useState<TeamMember[]>(
+    savedState?.isConnected ? savedState.team : INITIAL_TEAM
+  );
+  const [issues, setIssues] = useState<JiraIssue[]>(
+    savedState?.isConnected ? savedState.issues : MOCK_ISSUES
+  );
+  const [sprints, setSprints] = useState<Sprint[]>(
+    savedState?.isConnected ? savedState.sprints : INITIAL_SPRINTS
+  );
   
   // Jira State
   const [showJiraModal, setShowJiraModal] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
-  const [isConnected, setIsConnected] = useState(false);
-  const [projectKey, setProjectKey] = useState<string>("");
+  const [isConnected, setIsConnected] = useState(savedState?.isConnected || false);
+  const [projectKey, setProjectKey] = useState<string>(savedState?.projectKey || "");
 
   // AI State
   const [analysis, setAnalysis] = useState<GeminiAnalysisResult | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [showAnalysisModal, setShowAnalysisModal] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+
+  // Helper to persist state
+  const saveState = (data: { team: TeamMember[], issues: JiraIssue[], sprints: Sprint[], projectKey: string, isConnected: boolean }) => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    } catch (e) {
+      console.error('Failed to save state:', e);
+    }
+  };
 
   // Jira Connection Handler
   const handleJiraConnect = async (config: JiraConfig) => {
@@ -56,6 +88,16 @@ function App() {
       setProjectKey(config.projectKey);
       setIsConnected(true);
       setShowJiraModal(false);
+
+      // Persist to local storage
+      saveState({
+        team: fetchedTeam,
+        sprints: fetchedSprints,
+        issues: fetchedIssues,
+        projectKey: config.projectKey,
+        isConnected: true
+      });
+
       return true;
     } catch (error) {
       console.error("Connection error:", error);
@@ -73,6 +115,15 @@ function App() {
     setProjectKey("MANUAL-IMPORT");
     setIsConnected(true);
     setShowJiraModal(false);
+
+    // Persist to local storage
+    saveState({
+      team: data.team,
+      sprints: data.sprints,
+      issues: data.issues,
+      projectKey: "MANUAL-IMPORT",
+      isConnected: true
+    });
   };
 
   const handleDisconnect = () => {
@@ -83,6 +134,9 @@ function App() {
     setProjectKey("");
     // Optionally clear analysis results as they might be stale
     setAnalysis(null);
+    
+    // Clear local storage
+    localStorage.removeItem(STORAGE_KEY);
   };
 
   // AI Analysis Handler
