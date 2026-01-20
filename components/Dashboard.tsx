@@ -35,22 +35,36 @@ export const Dashboard: React.FC<DashboardProps> = ({ issues, team, sprints }) =
 
   const burnoutData = useMemo(() => {
     return team.map(member => {
-      // Filter for issues in the active sprint, or all active issues if no sprint is active
-      const memberIssues = issues.filter(i => {
-        const isAssigned = i.assigneeId === member.id;
-        const isInScope = activeSprint ? i.sprintId === activeSprint.id : i.status !== Status.DONE;
-        return isAssigned && isInScope;
-      });
+      // 1. Calculate Active Load (Utilization)
+      // Matches Capacity Planner: All issues assigned to user that are NOT Done.
+      // This includes items in the active sprint AND items in the backlog/no-sprint assigned to them.
+      const activeAssignedIssues = issues.filter(i => 
+        i.assigneeId === member.id && 
+        i.status !== Status.DONE
+      );
+      const activeAssignedPoints = activeAssignedIssues.reduce((acc, i) => acc + (i.storyPoints || 0), 0);
 
-      const assigned = memberIssues.reduce((acc, i) => acc + (i.storyPoints || 0), 0);
-      const completed = memberIssues.filter(i => i.status === Status.DONE).reduce((acc, i) => acc + (i.storyPoints || 0), 0);
-      
+      // 2. Calculate Completed Work (Realization)
+      // Context: If there is an active sprint, only count items done in that sprint.
+      // If no active sprint, count all done items (or 0). 
+      // This keeps Realization relevant to the current timebox.
+      const completedIssues = issues.filter(i => 
+        i.assigneeId === member.id && 
+        i.status === Status.DONE &&
+        (activeSprint ? i.sprintId === activeSprint.id : true)
+      );
+      const completedPoints = completedIssues.reduce((acc, i) => acc + (i.storyPoints || 0), 0);
+
       const capacity = member.capacityPerSprint;
-      // Cap utilization visualization at 120% to keep chart readable, but track real value
-      const rawUtilization = capacity > 0 ? (assigned / capacity) * 100 : 0;
+      
+      // Utilization = Active Load / Capacity
+      const rawUtilization = capacity > 0 ? (activeAssignedPoints / capacity) * 100 : 0;
       const utilization = Math.min(rawUtilization, 120); 
       
-      const realization = assigned > 0 ? (completed / assigned) * 100 : 0;
+      // Realization = Completed / (Active + Completed)
+      // This represents progress against the total known scope for this user
+      const totalScope = activeAssignedPoints + completedPoints;
+      const realization = totalScope > 0 ? (completedPoints / totalScope) * 100 : 0;
 
       return {
         name: member.name.split(' ')[0], // First name only for chart space
@@ -58,12 +72,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ issues, team, sprints }) =
         utilization: Math.round(utilization),
         rawUtilization: Math.round(rawUtilization),
         realization: Math.round(realization),
-        assigned,
+        assigned: activeAssignedPoints,
         capacity,
         isRisk: rawUtilization > 85
       };
     })
-    .filter(d => d.assigned > 0) // Only show members with assigned work
+    .filter(d => d.assigned > 0 || d.realization > 0) // Show if they have active work OR completed work
     .sort((a, b) => b.rawUtilization - a.rawUtilization); 
   }, [issues, team, activeSprint]);
 
@@ -250,7 +264,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ issues, team, sprints }) =
                     <Cell key={`cell-${index}`} fill={entry.isRisk ? '#fca5a5' : '#cbd5e1'} />
                   ))}
               </Bar>
-              <Line type="monotone" dataKey="realization" name="Realization (Done/Assigned)" stroke="#3b82f6" strokeWidth={3} dot={{ r: 4, fill: "#3b82f6", strokeWidth: 2, stroke: "#fff" }} />
+              <Line type="monotone" dataKey="realization" name="Realization (Done/Scope)" stroke="#3b82f6" strokeWidth={3} dot={{ r: 4, fill: "#3b82f6", strokeWidth: 2, stroke: "#fff" }} />
             </ComposedChart>
           </ResponsiveContainer>
         </div>
