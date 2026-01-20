@@ -94,7 +94,8 @@ export const JiraConnect: React.FC<JiraConnectProps> = ({ onConnect, onManualImp
   const getSearchUrl = () => {
     const baseUrl = manualDomain.replace(/\/$/, '');
     const jql = `project = ${manualProjectKey} AND statusCategory != Done ORDER BY rank`;
-    return `${baseUrl}/rest/api/3/search?jql=${encodeURIComponent(jql)}&maxResults=100&fields=summary,status,priority,issuetype,assignee,customfield_10016`;
+    // Fallback to API v2 which often still supports GET when v3 is strict or POST-only
+    return `${baseUrl}/rest/api/2/search?jql=${encodeURIComponent(jql)}&maxResults=100&fields=summary,status,priority,issuetype,assignee,customfield_10016`;
   };
 
   return (

@@ -49,11 +49,22 @@ export class JiraService {
   }
 
   // Helper to handle Proxy URL construction with fallback
-  private async fetchFromJira(endpoint: string): Promise<Response> {
+  private async fetchFromJira(endpoint: string, options: RequestInit = {}): Promise<Response> {
     const targetUrl = `${this.baseUrl}${endpoint}`;
     
+    // Merge headers
+    const reqHeaders = {
+      ...this.headers,
+      ...(options.headers || {})
+    };
+    
+    const reqOptions: RequestInit = {
+      ...options,
+      headers: reqHeaders
+    };
+
     if (!this.config.useProxy) {
-      return fetch(targetUrl, { headers: this.headers });
+      return fetch(targetUrl, reqOptions);
     }
 
     // Proxy fallback strategy
@@ -69,7 +80,7 @@ export class JiraService {
     for (const proxyGen of proxies) {
       try {
         const proxyUrl = proxyGen(targetUrl);
-        const response = await fetch(proxyUrl, { headers: this.headers });
+        const response = await fetch(proxyUrl, reqOptions);
         // If fetch succeeds (even with 4xx/5xx), return the response
         return response;
       } catch (e: any) {
@@ -143,9 +154,16 @@ export class JiraService {
 
   async getIssues(): Promise<JiraIssue[]> {
     const jql = `project = ${this.config.projectKey} AND statusCategory != Done ORDER BY rank`;
-    const response = await this.fetchFromJira(
-      `/rest/api/3/search?jql=${encodeURIComponent(jql)}&maxResults=100&fields=summary,status,priority,issuetype,assignee,customfield_10016,sprint`
-    );
+    
+    // Use POST /search to avoid GET deprecations and URL length limits
+    const response = await this.fetchFromJira('/rest/api/3/search', {
+      method: 'POST',
+      body: JSON.stringify({
+        jql,
+        maxResults: 100,
+        fields: ['summary', 'status', 'priority', 'issuetype', 'assignee', 'customfield_10016', 'sprint']
+      })
+    });
 
     if (!response.ok) throw new Error(`Failed to fetch issues: ${response.statusText}`);
     const data = await response.json();
