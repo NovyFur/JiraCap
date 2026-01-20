@@ -64,6 +64,14 @@ function App() {
     }
   };
 
+  const handleManualImport = (data: { team: TeamMember[], issues: JiraIssue[], sprints: Sprint[] }) => {
+    setTeam(data.team);
+    setSprints(data.sprints);
+    setIssues(data.issues);
+    setIsConnected(true);
+    setShowJiraModal(false);
+  };
+
   // AI Analysis Handler
   const handleAnalyze = async () => {
     setIsAnalyzing(true);
@@ -106,18 +114,24 @@ function App() {
         return (
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
             <h2 className="text-xl font-bold mb-4">Team Members</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {team.map(member => (
-                <div key={member.id} className="flex items-center gap-4 p-4 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors">
-                  <img src={member.avatar} alt={member.name} className="w-12 h-12 rounded-full" />
-                  <div>
-                    <div className="font-semibold text-slate-900">{member.name}</div>
-                    <div className="text-sm text-slate-500">{member.role}</div>
-                    <div className="text-xs text-slate-400 mt-1">Capacity: {member.capacityPerSprint} pts</div>
+            {team.length === 0 ? (
+              <div className="text-slate-500 text-center py-10">
+                No team members found in the imported data.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {team.map(member => (
+                  <div key={member.id} className="flex items-center gap-4 p-4 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors">
+                    <img src={member.avatar || `https://ui-avatars.com/api/?name=${member.name}`} alt={member.name} className="w-12 h-12 rounded-full" />
+                    <div>
+                      <div className="font-semibold text-slate-900">{member.name}</div>
+                      <div className="text-sm text-slate-500">{member.role}</div>
+                      <div className="text-xs text-slate-400 mt-1">Capacity: {member.capacityPerSprint} pts</div>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         );
       default:
@@ -232,6 +246,7 @@ function App() {
           <JiraConnect 
             isLoading={isConnecting} 
             onConnect={handleJiraConnect} 
+            onManualImport={handleManualImport}
             onCancel={() => setShowJiraModal(false)} 
           />
         </div>

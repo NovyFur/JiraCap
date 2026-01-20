@@ -1,7 +1,7 @@
 import { JiraConfig, JiraIssue, TeamMember, Sprint, IssueType, Priority, Status } from '../types';
 
 // Helper to determine Issue Type from string
-const mapIssueType = (type: string): IssueType => {
+export const mapIssueType = (type: string): IssueType => {
   const lower = type.toLowerCase();
   if (lower.includes('bug')) return IssueType.BUG;
   if (lower.includes('task')) return IssueType.TASK;
@@ -10,7 +10,7 @@ const mapIssueType = (type: string): IssueType => {
 };
 
 // Helper to determine Priority
-const mapPriority = (priority: string): Priority => {
+export const mapPriority = (priority: string): Priority => {
   const lower = priority.toLowerCase();
   if (lower.includes('highest') || lower.includes('blocker')) return Priority.HIGHEST;
   if (lower.includes('high') || lower.includes('critical')) return Priority.HIGH;
@@ -19,7 +19,7 @@ const mapPriority = (priority: string): Priority => {
 };
 
 // Helper to determine Status
-const mapStatus = (status: string, statusCategory?: string): Status => {
+export const mapStatus = (status: string, statusCategory?: string): Status => {
   const lower = status.toLowerCase();
   const catLower = statusCategory?.toLowerCase() || '';
 
@@ -107,7 +107,6 @@ export class JiraService {
   }
 
   async getTeamMembers(): Promise<TeamMember[]> {
-    // Fetch assignable users for the project
     const response = await this.fetchFromJira(
       `/rest/api/3/user/assignable/search?project=${this.config.projectKey}`
     );
@@ -115,21 +114,11 @@ export class JiraService {
     if (!response.ok) throw new Error(`Failed to fetch users: ${response.statusText}`);
     const users = await response.json();
 
-    return users
-      .filter((u: any) => u.accountType === 'atlassian') // Filter out app users if possible
-      .map((u: any) => ({
-        id: u.accountId,
-        name: u.displayName,
-        role: 'Developer', // Jira doesn't really have roles in this endpoint, defaulting
-        avatar: u.avatarUrls['48x48'],
-        capacityPerSprint: 10, // Default capacity, as Jira doesn't store this on the user object usually
-        skills: []
-      }));
+    return JiraService.parseTeamFromRaw(users);
   }
 
   async getSprints(): Promise<Sprint[]> {
-    // First we need to find the board for the project. This is a heuristic.
-    // We search for boards with the project name or key.
+    // First we need to find the board for the project.
     const boardResp = await this.fetchFromJira(
       `/rest/agile/1.0/board?projectKeyOrId=${this.config.projectKey}`
     );
@@ -149,13 +138,7 @@ export class JiraService {
     if (!sprintResp.ok) throw new Error(`Failed to fetch sprints: ${sprintResp.statusText}`);
     const sprintData = await sprintResp.json();
 
-    return sprintData.values.map((s: any) => ({
-      id: s.id.toString(),
-      name: s.name,
-      startDate: s.startDate || new Date().toISOString(),
-      endDate: s.endDate || new Date(Date.now() + 12096e5).toISOString(), // +14 days default
-      state: s.state
-    }));
+    return JiraService.parseSprintsFromRaw(sprintData);
   }
 
   async getIssues(): Promise<JiraIssue[]> {
@@ -167,16 +150,44 @@ export class JiraService {
     if (!response.ok) throw new Error(`Failed to fetch issues: ${response.statusText}`);
     const data = await response.json();
 
-    return data.issues.map((i: any) => {
-      // Attempt to find story points. standard custom field is usually 10016 but varies by instance.
-      // We look for a field that looks like a number in the raw fields if we could, but here we assume logic or 0.
-      const storyPoints = i.fields.customfield_10016 || 0; 
-      
-      // Attempt to find sprint ID from custom fields if available, often hidden in array of strings
-      // For this simplified version, we'll leave sprintId undefined unless explicitly found in a known spot
-      // or if we iterate sprints and call getIssuesForSprint (which is slower but more accurate).
-      // Let's stick to basic mapping.
-      
+    return JiraService.parseIssuesFromRaw(data);
+  }
+
+  // --- Static Parsers for Manual Import ---
+
+  static parseTeamFromRaw(users: any[]): TeamMember[] {
+    if (!Array.isArray(users)) return [];
+    return users
+      .filter((u: any) => u.accountType === 'atlassian')
+      .map((u: any) => ({
+        id: u.accountId,
+        name: u.displayName,
+        role: 'Developer',
+        avatar: u.avatarUrls?.['48x48'] || '',
+        capacityPerSprint: 10,
+        skills: []
+      }));
+  }
+
+  static parseSprintsFromRaw(sprintData: any): Sprint[] {
+    const values = sprintData.values || sprintData; // Handle both wrapped and unwrapped
+    if (!Array.isArray(values)) return [];
+    
+    return values.map((s: any) => ({
+      id: s.id.toString(),
+      name: s.name,
+      startDate: s.startDate || new Date().toISOString(),
+      endDate: s.endDate || new Date(Date.now() + 12096e5).toISOString(),
+      state: s.state
+    }));
+  }
+
+  static parseIssuesFromRaw(data: any): JiraIssue[] {
+    const issues = data.issues || data; // Handle both wrapper and array
+    if (!Array.isArray(issues)) return [];
+
+    return issues.map((i: any) => {
+      const storyPoints = i.fields.customfield_10016 || 0;
       return {
         id: i.id,
         key: i.key,
@@ -186,7 +197,7 @@ export class JiraService {
         status: mapStatus(i.fields.status?.name || '', i.fields.status?.statusCategory?.name),
         assigneeId: i.fields.assignee?.accountId || null,
         storyPoints: typeof storyPoints === 'number' ? storyPoints : 0,
-        sprintId: undefined // Would require more complex parsing or separate API calls per sprint
+        sprintId: undefined
       };
     });
   }
