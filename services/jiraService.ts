@@ -48,20 +48,38 @@ export class JiraService {
     };
   }
 
-  // Helper to handle Proxy URL construction
+  // Helper to handle Proxy URL construction with fallback
   private async fetchFromJira(endpoint: string): Promise<Response> {
     const targetUrl = `${this.baseUrl}${endpoint}`;
     
-    // Switch to thingproxy as it handles Authorization headers reliably
-    const finalUrl = this.config.useProxy 
-      ? `https://thingproxy.freeboard.io/fetch/${targetUrl}` 
-      : targetUrl;
+    if (!this.config.useProxy) {
+      return fetch(targetUrl, { headers: this.headers });
+    }
 
-    const response = await fetch(finalUrl, {
-      headers: this.headers
-    });
+    // Proxy fallback strategy
+    // 1. corsproxy.io
+    // 2. thingproxy
+    const proxies = [
+      (u: string) => `https://corsproxy.io/?${encodeURIComponent(u)}`,
+      (u: string) => `https://thingproxy.freeboard.io/fetch/${u}`
+    ];
 
-    return response;
+    let lastError: Error | null = null;
+
+    for (const proxyGen of proxies) {
+      try {
+        const proxyUrl = proxyGen(targetUrl);
+        const response = await fetch(proxyUrl, { headers: this.headers });
+        // If fetch succeeds (even with 4xx/5xx), return the response
+        return response;
+      } catch (e: any) {
+        console.warn(`Proxy attempt failed:`, e);
+        lastError = e;
+        // Continue to next proxy
+      }
+    }
+
+    throw lastError || new Error("Network Error: Could not reach Jira via any proxy.");
   }
 
   async validateConnection(): Promise<boolean> {
@@ -77,7 +95,7 @@ export class JiraService {
       return true;
     } catch (e: any) {
       console.error("Jira connection validation failed", e);
-      // Re-throw the error so the UI can display the specific message
+      // Re-throw so UI can show message
       throw e;
     }
   }
