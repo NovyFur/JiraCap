@@ -157,8 +157,8 @@ export class JiraService {
   async getIssues(): Promise<JiraIssue[]> {
     const jql = `project = "${this.config.projectKey}" AND statusCategory != Done ORDER BY rank`;
     
-    // Explicitly using GET /rest/api/3/search/jql as requested by the deprecation notice.
-    const fields = ['summary', 'status', 'priority', 'issuetype', 'assignee', 'customfield_10016', 'sprint'];
+    // Included customfield_10020 which is the most common Sprint field ID
+    const fields = ['summary', 'status', 'priority', 'issuetype', 'assignee', 'customfield_10016', 'sprint', 'customfield_10020'];
     
     const params = new URLSearchParams();
     params.append('jql', jql);
@@ -216,6 +216,25 @@ export class JiraService {
 
     return issues.map((i: any) => {
       const storyPoints = i.fields.customfield_10016 || 0;
+      
+      // Determine Sprint ID from standard fields or custom fields
+      let sprintId = undefined;
+      
+      // Method 1: 'sprint' field (often an object in recent APIs)
+      if (i.fields.sprint && i.fields.sprint.id) {
+         sprintId = i.fields.sprint.id.toString();
+      } 
+      // Method 2: 'customfield_10020' (common Sprint array field)
+      else if (i.fields.customfield_10020 && Array.isArray(i.fields.customfield_10020)) {
+         // Find active sprint, or default to the first one
+         const active = i.fields.customfield_10020.find((s: any) => s.state === 'active');
+         const future = i.fields.customfield_10020.find((s: any) => s.state === 'future');
+         const target = active || future || i.fields.customfield_10020[0];
+         if (target && target.id) {
+            sprintId = target.id.toString();
+         }
+      }
+
       return {
         id: i.id,
         key: i.key,
@@ -225,7 +244,7 @@ export class JiraService {
         status: mapStatus(i.fields.status?.name || '', i.fields.status?.statusCategory?.name),
         assigneeId: i.fields.assignee?.accountId || null,
         storyPoints: typeof storyPoints === 'number' ? storyPoints : 0,
-        sprintId: undefined,
+        sprintId: sprintId,
         browserUrl: cleanDomain ? `${cleanDomain}/browse/${i.key}` : undefined
       };
     });

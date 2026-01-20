@@ -62,7 +62,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ issues, team, sprints }) =
         capacity,
         isRisk: rawUtilization > 85
       };
-    }).sort((a, b) => b.rawUtilization - a.rawUtilization); // Sort by highest utilization
+    })
+    .filter(d => d.assigned > 0) // Only show members with assigned work
+    .sort((a, b) => b.rawUtilization - a.rawUtilization); 
   }, [issues, team, activeSprint]);
 
   const forecastData = useMemo(() => {
