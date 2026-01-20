@@ -1,6 +1,6 @@
 import React from 'react';
 import { JiraIssue, TeamMember, Sprint, Status } from '../types';
-import { CheckCircle } from 'lucide-react';
+import { CheckCircle, Users } from 'lucide-react';
 
 interface CapacityPlannerProps {
   team: TeamMember[];
@@ -17,6 +17,12 @@ export const CapacityPlanner: React.FC<CapacityPlannerProps> = ({ team, issues }
   };
 
   const unassignedIssues = issues.filter(i => !i.assigneeId && i.status !== Status.DONE);
+
+  // Filter team members who have active tasks
+  const activeTeamMembers = team.filter(member => {
+    const stats = getMemberStats(member.id);
+    return stats.issueCount > 0;
+  });
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-140px)]">
@@ -60,17 +66,27 @@ export const CapacityPlanner: React.FC<CapacityPlannerProps> = ({ team, issues }
 
       {/* Team Capacity Column */}
       <div className="lg:col-span-2 flex flex-col bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="p-4 border-b border-slate-100 bg-slate-50">
-          <h3 className="font-semibold text-slate-800">Team Workload</h3>
+        <div className="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+          <h3 className="font-semibold text-slate-800">Active Workloads</h3>
+          <span className="text-xs text-slate-500">
+            {activeTeamMembers.length} active members
+          </span>
         </div>
         <div className="overflow-y-auto p-4 space-y-4 flex-1">
-          {team.map(member => {
+          {activeTeamMembers.length === 0 ? (
+            <div className="h-full flex flex-col items-center justify-center text-slate-400">
+              <Users className="h-12 w-12 mb-3 opacity-30" />
+              <p className="text-lg font-medium text-slate-600">No Active Workloads</p>
+              <p className="text-sm">Assign tasks to team members to see their capacity utilization.</p>
+            </div>
+          ) : (
+            activeTeamMembers.map(member => {
             const stats = getMemberStats(member.id);
             const utilization = Math.min(100, Math.round((stats.assignedPoints / member.capacityPerSprint) * 100));
             const isOverloaded = stats.assignedPoints > member.capacityPerSprint;
 
             return (
-              <div key={member.id} className="border border-slate-200 rounded-xl p-4">
+              <div key={member.id} className="border border-slate-200 rounded-xl p-4 transition-all hover:shadow-sm">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
                     <img src={member.avatar} alt={member.name} className="w-10 h-10 rounded-full border border-slate-200" />
@@ -118,7 +134,8 @@ export const CapacityPlanner: React.FC<CapacityPlannerProps> = ({ team, issues }
                 </div>
               </div>
             );
-          })}
+          })
+          )}
         </div>
       </div>
     </div>
