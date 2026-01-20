@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { 
   JiraIssue, TeamMember, Sprint, ViewMode, GeminiAnalysisResult, JiraConfig 
 } from './types';
@@ -13,8 +13,8 @@ import { Button } from './components/Button';
 import { analyzeCapacity, generateSampleData } from './services/geminiService';
 import { JiraService } from './services/jiraService';
 import { 
-  LayoutDashboard, Calendar, Users, Settings, 
-  Sparkles, RefreshCw, Plus, Database, Plug
+  LayoutDashboard, Calendar, Users, 
+  Sparkles, RefreshCw, Database, Plug
 } from 'lucide-react';
 
 function App() {

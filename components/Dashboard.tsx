@@ -151,7 +151,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ issues, team, sprints }) =
                 paddingAngle={5}
                 dataKey="value"
               >
-                {statusData.map((entry, index) => (
+                {statusData.map((_, index) => (
                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                 ))}
               </Pie>

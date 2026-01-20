@@ -1,6 +1,6 @@
 import React from 'react';
 import { GeminiAnalysisResult } from '../types';
-import { X, AlertTriangle, Lightbulb, ArrowRight, BrainCircuit, CheckCircle2 } from 'lucide-react';
+import { X, AlertTriangle, Lightbulb, BrainCircuit, CheckCircle2 } from 'lucide-react';
 import { Button } from './Button';
 
 interface AnalysisModalProps {

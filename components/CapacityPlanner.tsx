@@ -1,6 +1,6 @@
 import React from 'react';
 import { JiraIssue, TeamMember, Sprint, Status } from '../types';
-import { User, AlertCircle, CheckCircle } from 'lucide-react';
+import { CheckCircle } from 'lucide-react';
 
 interface CapacityPlannerProps {
   team: TeamMember[];
