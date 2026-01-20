@@ -47,7 +47,8 @@ export const JiraConnect: React.FC<JiraConnectProps> = ({ onConnect, onManualImp
       // Basic validation
       if (!data.issues && !Array.isArray(data)) throw new Error("Invalid JSON format. Expected Jira API response.");
       
-      const parsedIssues = JiraService.parseIssuesFromRaw(data);
+      // Parse with domain to enable links
+      const parsedIssues = JiraService.parseIssuesFromRaw(data, manualDomain);
       if (parsedIssues.length === 0) throw new Error("No issues found in the JSON.");
 
       // For manual import, we create mock team/sprints if we only have issue data

@@ -31,6 +31,7 @@ export interface JiraIssue {
   sprintId?: string;
   dueDate?: string;
   projectKey?: string;
+  browserUrl?: string;
 }
 
 export interface TeamMember {

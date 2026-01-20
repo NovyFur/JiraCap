@@ -110,9 +110,6 @@ function App() {
       // Merge Data
       const mergedProjects = [...projects, config.projectKey];
       
-      // If this is the first project, replace mock data. Otherwise, append.
-      // We check if we are currently using mock data (empty projects list usually means mock data if issues exist)
-      // Actually, let's just use the projects array length.
       const isFirstProject = projects.length === 0;
 
       let nextTeam = isFirstProject ? [] : [...team];
@@ -182,15 +179,10 @@ function App() {
     const nextIssues = issues.filter(i => i.projectKey !== projectKeyToRemove);
     const nextSprints = sprints.filter(s => s.projectKey !== projectKeyToRemove);
     
-    // We keep all team members for now to avoid complexity of checking who is left
-    // But ideally we'd filter team members who no longer have assignments
-    
     setProjects(nextProjects);
     setIssues(nextIssues);
     setSprints(nextSprints);
 
-    // If no projects left, reset to defaults or empty? 
-    // Let's reset to defaults if user clears everything so UI isn't empty
     if (nextProjects.length === 0) {
       setTeam(INITIAL_TEAM);
       setIssues(MOCK_ISSUES);
@@ -201,6 +193,14 @@ function App() {
       setTeam(team); // keep team
       persistCurrentState(team, nextIssues, nextSprints, nextProjects);
     }
+  };
+
+  const handleCapacityChange = (memberId: string, newCapacity: number) => {
+    const nextTeam = team.map(m =>
+      m.id === memberId ? { ...m, capacityPerSprint: newCapacity } : m
+    );
+    setTeam(nextTeam);
+    persistCurrentState(nextTeam, issues, sprints, projects);
   };
 
   // AI Analysis Handler
@@ -224,11 +224,8 @@ function App() {
     try {
       const data = await generateSampleData("A modern e-commerce platform migration to microservices");
       
-      // Treat generated data as a fresh start or add? 
-      // For simplicity, generate replaces everything to give a clean demo state.
       setTeam(data.team);
       setIssues(data.issues);
-      // Keep sprints simple
       setProjects([]); 
       localStorage.removeItem(STORAGE_KEY);
       
@@ -260,10 +257,20 @@ function App() {
                 {team.map(member => (
                   <div key={member.id} className="flex items-center gap-4 p-4 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors">
                     <img src={member.avatar || `https://ui-avatars.com/api/?name=${member.name}`} alt={member.name} className="w-12 h-12 rounded-full" />
-                    <div>
+                    <div className="flex-1">
                       <div className="font-semibold text-slate-900">{member.name}</div>
                       <div className="text-sm text-slate-500">{member.role}</div>
-                      <div className="text-xs text-slate-400 mt-1">Capacity: {member.capacityPerSprint} pts</div>
+                      <div className="flex items-center gap-2 mt-2">
+                        <span className="text-xs text-slate-500">Capacity:</span>
+                        <input
+                          type="number"
+                          min="0"
+                          className="w-16 px-2 py-1 text-xs border rounded bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                          value={member.capacityPerSprint}
+                          onChange={(e) => handleCapacityChange(member.id, parseInt(e.target.value) || 0)}
+                        />
+                        <span className="text-xs text-slate-400">pts</span>
+                      </div>
                     </div>
                   </div>
                 ))}

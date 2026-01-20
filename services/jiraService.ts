@@ -158,8 +158,6 @@ export class JiraService {
     const jql = `project = "${this.config.projectKey}" AND statusCategory != Done ORDER BY rank`;
     
     // Explicitly using GET /rest/api/3/search/jql as requested by the deprecation notice.
-    // This new endpoint replaces GET /rest/api/3/search.
-    // Using GET is preferred here to minimize issues with proxies that might mishandle POST bodies.
     const fields = ['summary', 'status', 'priority', 'issuetype', 'assignee', 'customfield_10016', 'sprint'];
     
     const params = new URLSearchParams();
@@ -177,7 +175,8 @@ export class JiraService {
     }
     const data = await response.json();
 
-    return JiraService.parseIssuesFromRaw(data);
+    // Pass the configured domain to the parser
+    return JiraService.parseIssuesFromRaw(data, this.config.domain);
   }
 
   // --- Static Parsers for Manual Import ---
@@ -209,9 +208,11 @@ export class JiraService {
     }));
   }
 
-  static parseIssuesFromRaw(data: any): JiraIssue[] {
+  static parseIssuesFromRaw(data: any, domain?: string): JiraIssue[] {
     const issues = data.issues || data; // Handle both wrapper and array
     if (!Array.isArray(issues)) return [];
+
+    const cleanDomain = domain ? domain.replace(/\/$/, '') : undefined;
 
     return issues.map((i: any) => {
       const storyPoints = i.fields.customfield_10016 || 0;
@@ -224,7 +225,8 @@ export class JiraService {
         status: mapStatus(i.fields.status?.name || '', i.fields.status?.statusCategory?.name),
         assigneeId: i.fields.assignee?.accountId || null,
         storyPoints: typeof storyPoints === 'number' ? storyPoints : 0,
-        sprintId: undefined
+        sprintId: undefined,
+        browserUrl: cleanDomain ? `${cleanDomain}/browse/${i.key}` : undefined
       };
     });
   }

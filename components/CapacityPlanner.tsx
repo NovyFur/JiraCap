@@ -1,6 +1,6 @@
 import React from 'react';
 import { JiraIssue, TeamMember, Sprint, Status } from '../types';
-import { CheckCircle, Users } from 'lucide-react';
+import { CheckCircle, Users, ExternalLink } from 'lucide-react';
 
 interface CapacityPlannerProps {
   team: TeamMember[];
@@ -24,6 +24,45 @@ export const CapacityPlanner: React.FC<CapacityPlannerProps> = ({ team, issues }
     return stats.issueCount > 0;
   });
 
+  const renderIssueCard = (issue: JiraIssue) => {
+    const cardContent = (
+      <>
+        <div className="flex justify-between items-start mb-1">
+          <span className="text-xs font-mono text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded group-hover:bg-blue-100 group-hover:text-blue-700 transition-colors">
+            {issue.key}
+          </span>
+          <span className={`text-[10px] uppercase font-bold px-1.5 py-0.5 rounded ${
+            issue.priority === 'Highest' || issue.priority === 'High' ? 'bg-red-100 text-red-600' : 'bg-blue-50 text-blue-600'
+          }`}>
+            {issue.priority}
+          </span>
+        </div>
+        <div className="flex items-start justify-between gap-2">
+          <p className="text-sm text-slate-800 font-medium mb-2 hover:text-blue-600 transition-colors">{issue.summary}</p>
+          {issue.browserUrl && <ExternalLink size={12} className="text-slate-300 opacity-0 group-hover:opacity-100 shrink-0 mt-1" />}
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-medium text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full flex items-center">
+              {issue.storyPoints} pts
+          </span>
+          <span className="text-xs text-slate-400">{issue.type}</span>
+        </div>
+      </>
+    );
+
+    return (
+      <div key={issue.id} className="p-3 border border-slate-200 rounded-lg hover:shadow-md transition-all bg-white group relative">
+        {issue.browserUrl ? (
+          <a href={issue.browserUrl} target="_blank" rel="noopener noreferrer" className="block">
+            {cardContent}
+          </a>
+        ) : (
+          <div className="block cursor-move">{cardContent}</div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-140px)]">
       {/* Unassigned Backlog Column */}
@@ -41,25 +80,7 @@ export const CapacityPlanner: React.FC<CapacityPlannerProps> = ({ team, issues }
               <p>No unassigned issues</p>
             </div>
           ) : (
-            unassignedIssues.map(issue => (
-              <div key={issue.id} className="p-3 border border-slate-200 rounded-lg hover:shadow-md transition-shadow bg-white group cursor-move">
-                <div className="flex justify-between items-start mb-1">
-                  <span className="text-xs font-mono text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">{issue.key}</span>
-                  <span className={`text-[10px] uppercase font-bold px-1.5 py-0.5 rounded ${
-                    issue.priority === 'Highest' || issue.priority === 'High' ? 'bg-red-100 text-red-600' : 'bg-blue-50 text-blue-600'
-                  }`}>
-                    {issue.priority}
-                  </span>
-                </div>
-                <p className="text-sm text-slate-800 font-medium mb-2">{issue.summary}</p>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-medium text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full flex items-center">
-                     {issue.storyPoints} pts
-                  </span>
-                  <span className="text-xs text-slate-400">{issue.type}</span>
-                </div>
-              </div>
-            ))
+            unassignedIssues.map(renderIssueCard)
           )}
         </div>
       </div>
@@ -121,12 +142,19 @@ export const CapacityPlanner: React.FC<CapacityPlannerProps> = ({ team, issues }
                   ) : (
                     <div className="space-y-2">
                       {stats.issues.map(issue => (
-                        <div key={issue.id} className="flex items-center justify-between bg-white p-2 rounded border border-slate-200 shadow-sm text-sm">
-                          <div className="flex items-center gap-2 overflow-hidden">
-                             <span className="text-xs font-mono text-slate-400 shrink-0">{issue.key}</span>
-                             <span className="truncate text-slate-700">{issue.summary}</span>
+                        <div key={issue.id} className="flex items-center justify-between bg-white p-2 rounded border border-slate-200 shadow-sm text-sm group hover:border-blue-200 transition-colors">
+                          <div className="flex items-center gap-2 overflow-hidden flex-1">
+                             <span className="text-xs font-mono text-slate-400 shrink-0 bg-slate-50 px-1 rounded">{issue.key}</span>
+                             {issue.browserUrl ? (
+                               <a href={issue.browserUrl} target="_blank" rel="noopener noreferrer" className="truncate text-slate-700 hover:text-blue-600 hover:underline">
+                                 {issue.summary}
+                               </a>
+                             ) : (
+                               <span className="truncate text-slate-700">{issue.summary}</span>
+                             )}
                           </div>
                           <span className="text-xs font-bold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded ml-2 shrink-0">{issue.storyPoints}</span>
+                          {issue.browserUrl && <ExternalLink size={10} className="ml-1 text-slate-300 opacity-0 group-hover:opacity-100" />}
                         </div>
                       ))}
                     </div>
