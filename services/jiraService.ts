@@ -155,10 +155,17 @@ export class JiraService {
   }
 
   async getIssues(): Promise<JiraIssue[]> {
-    const jql = `project = "${this.config.projectKey}" AND statusCategory != Done ORDER BY rank`;
+    // Modified JQL to include recent Done issues to allow for Time Tracking analysis
+    // Fetching last 100 issues regardless of status, or we could limit by date `updated >= -30d`
+    const jql = `project = "${this.config.projectKey}" ORDER BY updated DESC`;
     
     // Included customfield_10020 which is the most common Sprint field ID
-    const fields = ['summary', 'status', 'priority', 'issuetype', 'assignee', 'customfield_10016', 'sprint', 'customfield_10020'];
+    // Added 'timespent', 'timeoriginalestimate', 'parent' for time tracking
+    const fields = [
+      'summary', 'status', 'priority', 'issuetype', 'assignee', 
+      'customfield_10016', 'sprint', 'customfield_10020',
+      'timespent', 'timeoriginalestimate', 'parent'
+    ];
     
     const params = new URLSearchParams();
     params.append('jql', jql);
@@ -245,7 +252,13 @@ export class JiraService {
         assigneeId: i.fields.assignee?.accountId || null,
         storyPoints: typeof storyPoints === 'number' ? storyPoints : 0,
         sprintId: sprintId,
-        browserUrl: cleanDomain ? `${cleanDomain}/browse/${i.key}` : undefined
+        browserUrl: cleanDomain ? `${cleanDomain}/browse/${i.key}` : undefined,
+        // Time Tracking (Seconds to Seconds)
+        timeSpentSeconds: i.fields.timespent || 0,
+        timeEstimateSeconds: i.fields.timeoriginalestimate || 0,
+        // Parent/Epic Info
+        parentKey: i.fields.parent?.key,
+        parentSummary: i.fields.parent?.fields?.summary
       };
     });
   }

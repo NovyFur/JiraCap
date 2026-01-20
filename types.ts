@@ -1,3 +1,4 @@
+
 export enum IssueType {
   STORY = 'Story',
   BUG = 'Bug',
@@ -32,6 +33,11 @@ export interface JiraIssue {
   dueDate?: string;
   projectKey?: string;
   browserUrl?: string;
+  // Time Tracking Fields
+  timeSpentSeconds: number;
+  timeEstimateSeconds: number;
+  parentKey?: string;
+  parentSummary?: string;
 }
 
 export interface TeamMember {
@@ -78,5 +84,6 @@ export enum ViewMode {
   DASHBOARD = 'DASHBOARD',
   PLANNER = 'PLANNER',
   TEAM = 'TEAM',
+  TIME_TRACKING = 'TIME_TRACKING',
   SETTINGS = 'SETTINGS'
 }

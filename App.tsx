@@ -7,13 +7,14 @@ import {
 } from './constants';
 import { Dashboard } from './components/Dashboard';
 import { CapacityPlanner } from './components/CapacityPlanner';
+import { TimeTrackingDashboard } from './components/TimeTrackingDashboard';
 import { JiraConnect } from './components/JiraConnect';
 import { AnalysisModal } from './components/AnalysisModal';
 import { Button } from './components/Button';
 import { analyzeCapacity, generateSampleData } from './services/geminiService';
 import { JiraService } from './services/jiraService';
 import { 
-  LayoutDashboard, Calendar, Users, 
+  LayoutDashboard, Calendar, Users, Clock,
   Sparkles, RefreshCw, Database, Plug, X, Plus
 } from 'lucide-react';
 
@@ -244,6 +245,8 @@ function App() {
         return <Dashboard issues={issues} team={team} sprints={sprints} />;
       case ViewMode.PLANNER:
         return <CapacityPlanner team={team} issues={issues} sprints={sprints} />;
+      case ViewMode.TIME_TRACKING:
+        return <TimeTrackingDashboard issues={issues} team={team} />;
       case ViewMode.TEAM:
         return (
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
@@ -310,6 +313,13 @@ function App() {
           >
             <Calendar size={18} />
             Capacity Planner
+          </button>
+          <button 
+            onClick={() => setView(ViewMode.TIME_TRACKING)}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${view === ViewMode.TIME_TRACKING ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}
+          >
+            <Clock size={18} />
+            Time Tracking
           </button>
           <button 
             onClick={() => setView(ViewMode.TEAM)}
@@ -384,6 +394,7 @@ function App() {
             <h1 className="text-2xl font-bold text-slate-900">
               {view === ViewMode.DASHBOARD && 'Dashboard Overview'}
               {view === ViewMode.PLANNER && 'Capacity Planning'}
+              {view === ViewMode.TIME_TRACKING && 'Time Tracking Analysis'}
               {view === ViewMode.TEAM && 'Team Management'}
             </h1>
             <p className="text-slate-500 text-sm mt-1">
