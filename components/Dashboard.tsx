@@ -39,16 +39,18 @@ export const Dashboard: React.FC<DashboardProps> = ({ issues, team, sprints }) =
   }, [issues]);
 
   const workloadData = useMemo(() => {
-    return team.map(member => {
-      const assignedPoints = issues
-        .filter(i => i.assigneeId === member.id && i.status !== Status.DONE)
-        .reduce((acc, i) => acc + i.storyPoints, 0);
-      return {
-        name: member.name.split(' ')[0],
-        capacity: member.capacityPerSprint,
-        assigned: assignedPoints
-      };
-    });
+    return team
+      .map(member => {
+        const assignedPoints = issues
+          .filter(i => i.assigneeId === member.id && i.status !== Status.DONE)
+          .reduce((acc, i) => acc + i.storyPoints, 0);
+        return {
+          name: member.name.split(' ')[0],
+          capacity: member.capacityPerSprint,
+          assigned: assignedPoints
+        };
+      })
+      .filter(member => member.assigned > 0);
   }, [issues, team]);
 
   const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042'];
@@ -124,17 +126,24 @@ export const Dashboard: React.FC<DashboardProps> = ({ issues, team, sprints }) =
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 h-[400px]">
           <h3 className="text-lg font-semibold text-slate-900 mb-4">Resource Utilization</h3>
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={workloadData} margin={{ top: 20, right: 30, left: 20, bottom: 50 }}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis dataKey="name" />
-              <YAxis />
-              <Tooltip />
-              <Legend />
-              <Bar dataKey="assigned" name="Assigned Points" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="capacity" name="Max Capacity" fill="#e2e8f0" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
+          {workloadData.length === 0 ? (
+            <div className="h-full flex flex-col items-center justify-center text-slate-400 pb-12">
+              <Users className="h-10 w-10 mb-2 opacity-30" />
+              <p className="text-sm">No active workloads to display</p>
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={workloadData} margin={{ top: 20, right: 30, left: 20, bottom: 50 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="name" />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="assigned" name="Assigned Points" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="capacity" name="Max Capacity" fill="#e2e8f0" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
         </div>
 
         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 h-[400px]">
