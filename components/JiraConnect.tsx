@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Button } from './Button';
 import { JiraConfig, TeamMember, JiraIssue, Sprint } from '../types';
 import { JiraService } from '../services/jiraService';
-import { Link, Lock, Globe, Mail, Box, ShieldCheck, FileJson, AlertTriangle, CheckCircle2, Copy } from 'lucide-react';
+import { Link, Lock, Globe, Mail, Box, ShieldCheck, FileJson, AlertTriangle, CheckCircle2 } from 'lucide-react';
 
 interface JiraConnectProps {
   onConnect: (config: JiraConfig) => Promise<boolean>;
