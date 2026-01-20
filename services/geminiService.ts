@@ -1,22 +1,13 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { JiraIssue, TeamMember, GeminiAnalysisResult, Sprint } from "../types";
 
-const apiKey = process.env.API_KEY || '';
-const ai = new GoogleGenAI({ apiKey });
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 export const analyzeCapacity = async (
   team: TeamMember[],
   issues: JiraIssue[],
   sprints: Sprint[]
 ): Promise<GeminiAnalysisResult> => {
-  if (!apiKey) {
-    return {
-      summary: "API Key missing. Please set the API_KEY environment variable.",
-      risks: [],
-      recommendations: []
-    };
-  }
-
   const prompt = `
     Analyze the following project capacity data for a software team.
     
@@ -86,8 +77,6 @@ export const analyzeCapacity = async (
 };
 
 export const generateSampleData = async (projectDesc: string): Promise<{ team: TeamMember[], issues: JiraIssue[] }> => {
-  if (!apiKey) throw new Error("API Key missing");
-
   const prompt = `
     Generate realistic sample data for a Jira-like capacity planner based on this project description: "${projectDesc}".
     
