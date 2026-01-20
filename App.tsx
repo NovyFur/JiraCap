@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { 
   JiraIssue, TeamMember, Sprint, ViewMode, GeminiAnalysisResult, JiraConfig 
 } from './types';
