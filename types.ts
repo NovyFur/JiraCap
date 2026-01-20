@@ -30,6 +30,7 @@ export interface JiraIssue {
   storyPoints: number;
   sprintId?: string;
   dueDate?: string;
+  projectKey?: string;
 }
 
 export interface TeamMember {
@@ -47,6 +48,7 @@ export interface Sprint {
   startDate: string;
   endDate: string;
   state: 'active' | 'future' | 'closed';
+  projectKey?: string;
 }
 
 export interface CapacitySnapshot {

@@ -14,7 +14,7 @@ import { analyzeCapacity, generateSampleData } from './services/geminiService';
 import { JiraService } from './services/jiraService';
 import { 
   LayoutDashboard, Calendar, Users, 
-  Sparkles, RefreshCw, Database, Plug, LogOut
+  Sparkles, RefreshCw, Database, Plug, X, Plus
 } from 'lucide-react';
 
 const STORAGE_KEY = 'jiracap_workspace_v1';
@@ -36,22 +36,25 @@ function App() {
   // Application State
   const [view, setView] = useState<ViewMode>(ViewMode.DASHBOARD);
   
-  // Initialize with saved data if connected, otherwise use defaults
+  // Initialize with saved data
   const [team, setTeam] = useState<TeamMember[]>(
-    savedState?.isConnected ? savedState.team : INITIAL_TEAM
+    savedState?.team || INITIAL_TEAM
   );
   const [issues, setIssues] = useState<JiraIssue[]>(
-    savedState?.isConnected ? savedState.issues : MOCK_ISSUES
+    savedState?.issues || MOCK_ISSUES
   );
   const [sprints, setSprints] = useState<Sprint[]>(
-    savedState?.isConnected ? savedState.sprints : INITIAL_SPRINTS
+    savedState?.sprints || INITIAL_SPRINTS
   );
   
   // Jira State
   const [showJiraModal, setShowJiraModal] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
-  const [isConnected, setIsConnected] = useState(savedState?.isConnected || false);
-  const [projectKey, setProjectKey] = useState<string>(savedState?.projectKey || "");
+  
+  // Track connected projects as a list of keys
+  const [projects, setProjects] = useState<string[]>(
+    savedState?.projects || []
+  );
 
   // AI State
   const [analysis, setAnalysis] = useState<GeminiAnalysisResult | null>(null);
@@ -60,7 +63,7 @@ function App() {
   const [isGenerating, setIsGenerating] = useState(false);
 
   // Helper to persist state
-  const saveState = (data: { team: TeamMember[], issues: JiraIssue[], sprints: Sprint[], projectKey: string, isConnected: boolean }) => {
+  const saveState = (data: { team: TeamMember[], issues: JiraIssue[], sprints: Sprint[], projects: string[] }) => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     } catch (e) {
@@ -68,40 +71,76 @@ function App() {
     }
   };
 
+  const persistCurrentState = (
+    newTeam: TeamMember[], 
+    newIssues: JiraIssue[], 
+    newSprints: Sprint[],
+    newProjects: string[]
+  ) => {
+    saveState({
+      team: newTeam,
+      issues: newIssues,
+      sprints: newSprints,
+      projects: newProjects
+    });
+  };
+
   // Jira Connection Handler
   const handleJiraConnect = async (config: JiraConfig) => {
+    if (projects.includes(config.projectKey)) {
+      alert(`Project ${config.projectKey} is already connected.`);
+      return false;
+    }
+
     setIsConnecting(true);
     try {
       const service = new JiraService(config);
       await service.validateConnection();
       
-      // If validation passes, fetch real data
       const [fetchedTeam, fetchedSprints, fetchedIssues] = await Promise.all([
         service.getTeamMembers(),
         service.getSprints(),
         service.getIssues()
       ]);
 
-      setTeam(fetchedTeam);
-      setSprints(fetchedSprints);
-      setIssues(fetchedIssues);
-      setProjectKey(config.projectKey);
-      setIsConnected(true);
+      // Tag data with project key
+      const taggedIssues = fetchedIssues.map(i => ({ ...i, projectKey: config.projectKey }));
+      const taggedSprints = fetchedSprints.map(s => ({ ...s, projectKey: config.projectKey }));
+
+      // Merge Data
+      const mergedProjects = [...projects, config.projectKey];
+      
+      // If this is the first project, replace mock data. Otherwise, append.
+      // We check if we are currently using mock data (empty projects list usually means mock data if issues exist)
+      // Actually, let's just use the projects array length.
+      const isFirstProject = projects.length === 0;
+
+      let nextTeam = isFirstProject ? [] : [...team];
+      let nextIssues = isFirstProject ? [] : [...issues];
+      let nextSprints = isFirstProject ? [] : [...sprints];
+
+      // Merge Team (deduplicate by ID)
+      const teamMap = new Map(nextTeam.map(m => [m.id, m]));
+      fetchedTeam.forEach(m => teamMap.set(m.id, m));
+      nextTeam = Array.from(teamMap.values());
+
+      // Merge Issues and Sprints
+      nextIssues = [...nextIssues, ...taggedIssues];
+      nextSprints = [...nextSprints, ...taggedSprints];
+
+      setTeam(nextTeam);
+      setIssues(nextIssues);
+      setSprints(nextSprints);
+      setProjects(mergedProjects);
+      
+      setIsConnecting(false);
       setShowJiraModal(false);
 
-      // Persist to local storage
-      saveState({
-        team: fetchedTeam,
-        sprints: fetchedSprints,
-        issues: fetchedIssues,
-        projectKey: config.projectKey,
-        isConnected: true
-      });
+      persistCurrentState(nextTeam, nextIssues, nextSprints, mergedProjects);
 
       return true;
     } catch (error) {
       console.error("Connection error:", error);
-      // Propagate error to JiraConnect component
       throw error;
     } finally {
       setIsConnecting(false);
@@ -109,34 +148,59 @@ function App() {
   };
 
   const handleManualImport = (data: { team: TeamMember[], issues: JiraIssue[], sprints: Sprint[] }) => {
-    setTeam(data.team);
-    setSprints(data.sprints);
-    setIssues(data.issues);
-    setProjectKey("MANUAL-IMPORT");
-    setIsConnected(true);
+    const manualKey = "MANUAL-IMPORT-" + (projects.length + 1);
+    
+    const taggedIssues = data.issues.map(i => ({ ...i, projectKey: manualKey }));
+    const taggedSprints = data.sprints.map(s => ({ ...s, projectKey: manualKey }));
+
+    const isFirstProject = projects.length === 0;
+
+    let nextTeam = isFirstProject ? [] : [...team];
+    let nextIssues = isFirstProject ? [] : [...issues];
+    let nextSprints = isFirstProject ? [] : [...sprints];
+
+    const teamMap = new Map(nextTeam.map(m => [m.id, m]));
+    data.team.forEach(m => teamMap.set(m.id, m));
+    nextTeam = Array.from(teamMap.values());
+
+    nextIssues = [...nextIssues, ...taggedIssues];
+    nextSprints = [...nextSprints, ...taggedSprints];
+    const nextProjects = [...projects, manualKey];
+
+    setTeam(nextTeam);
+    setSprints(nextSprints);
+    setIssues(nextIssues);
+    setProjects(nextProjects);
+    
     setShowJiraModal(false);
 
-    // Persist to local storage
-    saveState({
-      team: data.team,
-      sprints: data.sprints,
-      issues: data.issues,
-      projectKey: "MANUAL-IMPORT",
-      isConnected: true
-    });
+    persistCurrentState(nextTeam, nextIssues, nextSprints, nextProjects);
   };
 
-  const handleDisconnect = () => {
-    setIsConnected(false);
-    setTeam(INITIAL_TEAM);
-    setIssues(MOCK_ISSUES);
-    setSprints(INITIAL_SPRINTS);
-    setProjectKey("");
-    // Optionally clear analysis results as they might be stale
-    setAnalysis(null);
+  const handleRemoveProject = (projectKeyToRemove: string) => {
+    const nextProjects = projects.filter(p => p !== projectKeyToRemove);
+    const nextIssues = issues.filter(i => i.projectKey !== projectKeyToRemove);
+    const nextSprints = sprints.filter(s => s.projectKey !== projectKeyToRemove);
     
-    // Clear local storage
-    localStorage.removeItem(STORAGE_KEY);
+    // We keep all team members for now to avoid complexity of checking who is left
+    // But ideally we'd filter team members who no longer have assignments
+    
+    setProjects(nextProjects);
+    setIssues(nextIssues);
+    setSprints(nextSprints);
+
+    // If no projects left, reset to defaults or empty? 
+    // Let's reset to defaults if user clears everything so UI isn't empty
+    if (nextProjects.length === 0) {
+      setTeam(INITIAL_TEAM);
+      setIssues(MOCK_ISSUES);
+      setSprints(INITIAL_SPRINTS);
+      persistCurrentState(INITIAL_TEAM, MOCK_ISSUES, INITIAL_SPRINTS, []);
+      localStorage.removeItem(STORAGE_KEY);
+    } else {
+      setTeam(team); // keep team
+      persistCurrentState(team, nextIssues, nextSprints, nextProjects);
+    }
   };
 
   // AI Analysis Handler
@@ -159,9 +223,15 @@ function App() {
     setIsGenerating(true);
     try {
       const data = await generateSampleData("A modern e-commerce platform migration to microservices");
+      
+      // Treat generated data as a fresh start or add? 
+      // For simplicity, generate replaces everything to give a clean demo state.
       setTeam(data.team);
       setIssues(data.issues);
-      // Keep existing sprints for simplicity or generate them too if needed
+      // Keep sprints simple
+      setProjects([]); 
+      localStorage.removeItem(STORAGE_KEY);
+      
       alert("Sample data generated successfully!");
     } catch (error) {
       console.error("Generation failed:", error);
@@ -183,7 +253,7 @@ function App() {
             <h2 className="text-xl font-bold mb-4">Team Members</h2>
             {team.length === 0 ? (
               <div className="text-slate-500 text-center py-10">
-                No team members found in the imported data.
+                No team members found.
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -205,6 +275,8 @@ function App() {
         return <div className="p-10 text-center text-slate-500">View not implemented</div>;
     }
   };
+
+  const isConnected = projects.length > 0;
 
   return (
     <div className="min-h-screen flex bg-slate-50 text-slate-900 font-sans">
@@ -242,9 +314,22 @@ function App() {
         </nav>
 
         <div className="p-4 border-t border-slate-100 space-y-3">
+           <div className="flex items-center justify-between mb-2">
+             <span className="text-xs font-semibold text-slate-500 uppercase">Projects</span>
+             {isConnected && (
+               <button 
+                 onClick={() => setShowJiraModal(true)}
+                 className="p-1 hover:bg-blue-50 text-blue-600 rounded"
+                 title="Add another project"
+               >
+                 <Plus size={14} />
+               </button>
+             )}
+           </div>
+           
            {!isConnected ? (
               <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
-                <p className="text-xs text-slate-500 mb-2">Connect to your Jira project to see real data.</p>
+                <p className="text-xs text-slate-500 mb-2">Connect to your Jira projects to see real data.</p>
                 <Button 
                   size="sm" 
                   className="w-full" 
@@ -256,31 +341,31 @@ function App() {
                 </Button>
               </div>
            ) : (
-             <div className="bg-white p-3 rounded-lg border border-green-200 shadow-sm">
-               <div className="flex items-center justify-between mb-2">
-                 <div className="flex items-center gap-2 text-sm font-medium text-slate-900">
-                    <div className="relative flex h-2 w-2">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-                    </div>
-                    Jira Connected
+             <div className="space-y-2">
+               {projects.map(projKey => (
+                 <div key={projKey} className="bg-white p-2 rounded-lg border border-green-200 shadow-sm flex items-center justify-between group">
+                   <div className="flex items-center gap-2 overflow-hidden">
+                      <div className="w-2 h-2 bg-green-500 rounded-full shrink-0"></div>
+                      <span className="text-xs font-medium text-slate-900 truncate" title={projKey}>{projKey}</span>
+                   </div>
+                   <button 
+                      onClick={() => handleRemoveProject(projKey)}
+                      className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all p-1"
+                      title="Remove Project"
+                   >
+                     <X size={14} />
+                   </button>
                  </div>
-                 <button 
-                    onClick={handleDisconnect}
-                    className="text-slate-400 hover:text-red-500 transition-colors p-1 rounded-md hover:bg-red-50"
-                    title="Disconnect Project"
-                 >
-                   <LogOut size={15} />
-                 </button>
+               ))}
+               
+               <div className="pt-2 text-[10px] text-center text-slate-400">
+                 {projects.length} connected project{projects.length !== 1 ? 's' : ''}
                </div>
-               <p className="text-xs text-slate-500 truncate" title={projectKey}>
-                 Project: {projectKey}
-               </p>
              </div>
            )}
            
-           <div className="text-xs text-center text-slate-400">
-              v1.0.0
+           <div className="mt-2 text-xs text-center text-slate-400">
+              v1.1.0 Multi-Project
            </div>
         </div>
       </aside>
@@ -295,7 +380,9 @@ function App() {
               {view === ViewMode.TEAM && 'Team Management'}
             </h1>
             <p className="text-slate-500 text-sm mt-1">
-              {isConnected ? 'Displaying live data from Jira' : 'Viewing local mock data'}
+              {isConnected 
+                ? `Analyzing ${projects.length} project${projects.length > 1 ? 's' : ''} (${issues.length} issues)` 
+                : 'Viewing local mock data'}
             </p>
           </div>
 
