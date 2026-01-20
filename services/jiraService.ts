@@ -43,7 +43,8 @@ export class JiraService {
     return {
       'Authorization': `Basic ${btoa(`${this.config.email}:${this.config.apiToken}`)}`,
       'Accept': 'application/json',
-      'Content-Type': 'application/json'
+      'Content-Type': 'application/json',
+      'X-Atlassian-Token': 'no-check'
     };
   }
 
@@ -51,24 +52,33 @@ export class JiraService {
   private async fetchFromJira(endpoint: string): Promise<Response> {
     const targetUrl = `${this.baseUrl}${endpoint}`;
     
-    // If proxy is enabled, wrap the URL
-    // We use corsproxy.io as it is a common stable public proxy for demos
+    // Switch to thingproxy as it handles Authorization headers reliably
     const finalUrl = this.config.useProxy 
-      ? `https://corsproxy.io/?${encodeURIComponent(targetUrl)}` 
+      ? `https://thingproxy.freeboard.io/fetch/${targetUrl}` 
       : targetUrl;
 
-    return fetch(finalUrl, {
+    const response = await fetch(finalUrl, {
       headers: this.headers
     });
+
+    return response;
   }
 
   async validateConnection(): Promise<boolean> {
     try {
       const response = await this.fetchFromJira('/rest/api/3/myself');
-      return response.ok;
-    } catch (e) {
+      
+      if (!response.ok) {
+        if (response.status === 401) throw new Error("Unauthorized: Invalid email or API token.");
+        if (response.status === 404) throw new Error("Not Found: Check your Jira Domain URL.");
+        if (response.status === 403) throw new Error("Forbidden: You may not have permission to access this Jira instance.");
+        throw new Error(`Jira Error (${response.status}): ${response.statusText}`);
+      }
+      return true;
+    } catch (e: any) {
       console.error("Jira connection validation failed", e);
-      return false;
+      // Re-throw the error so the UI can display the specific message
+      throw e;
     }
   }
 
@@ -84,7 +94,7 @@ export class JiraService {
       `/rest/api/3/user/assignable/search?project=${this.config.projectKey}`
     );
     
-    if (!response.ok) throw new Error("Failed to fetch users");
+    if (!response.ok) throw new Error(`Failed to fetch users: ${response.statusText}`);
     const users = await response.json();
 
     return users
@@ -106,7 +116,7 @@ export class JiraService {
       `/rest/agile/1.0/board?projectKeyOrId=${this.config.projectKey}`
     );
     
-    if (!boardResp.ok) throw new Error("Failed to fetch boards");
+    if (!boardResp.ok) throw new Error(`Failed to fetch boards: ${boardResp.statusText}`);
     const boardData = await boardResp.json();
     
     if (boardData.values.length === 0) return [];
@@ -118,7 +128,7 @@ export class JiraService {
       `/rest/agile/1.0/board/${boardId}/sprint?state=active,future`
     );
 
-    if (!sprintResp.ok) throw new Error("Failed to fetch sprints");
+    if (!sprintResp.ok) throw new Error(`Failed to fetch sprints: ${sprintResp.statusText}`);
     const sprintData = await sprintResp.json();
 
     return sprintData.values.map((s: any) => ({
@@ -136,7 +146,7 @@ export class JiraService {
       `/rest/api/3/search?jql=${encodeURIComponent(jql)}&maxResults=100&fields=summary,status,priority,issuetype,assignee,customfield_10016,sprint`
     );
 
-    if (!response.ok) throw new Error("Failed to fetch issues");
+    if (!response.ok) throw new Error(`Failed to fetch issues: ${response.statusText}`);
     const data = await response.json();
 
     return data.issues.map((i: any) => {

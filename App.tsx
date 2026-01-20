@@ -40,27 +40,25 @@ function App() {
     setIsConnecting(true);
     try {
       const service = new JiraService(config);
-      const isValid = await service.validateConnection();
+      await service.validateConnection();
       
-      if (isValid) {
-        // Fetch real data
-        const [fetchedTeam, fetchedSprints, fetchedIssues] = await Promise.all([
-          service.getTeamMembers(),
-          service.getSprints(),
-          service.getIssues()
-        ]);
+      // If validation passes, fetch real data
+      const [fetchedTeam, fetchedSprints, fetchedIssues] = await Promise.all([
+        service.getTeamMembers(),
+        service.getSprints(),
+        service.getIssues()
+      ]);
 
-        setTeam(fetchedTeam);
-        setSprints(fetchedSprints);
-        setIssues(fetchedIssues);
-        setIsConnected(true);
-        setShowJiraModal(false);
-        return true;
-      }
-      return false;
+      setTeam(fetchedTeam);
+      setSprints(fetchedSprints);
+      setIssues(fetchedIssues);
+      setIsConnected(true);
+      setShowJiraModal(false);
+      return true;
     } catch (error) {
       console.error("Connection error:", error);
-      return false;
+      // Propagate error to JiraConnect component
+      throw error;
     } finally {
       setIsConnecting(false);
     }

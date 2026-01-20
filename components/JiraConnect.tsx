@@ -22,9 +22,10 @@ export const JiraConnect: React.FC<JiraConnectProps> = ({ onConnect, isLoading, 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    const success = await onConnect(config);
-    if (!success) {
-      setError("Connection failed. Check credentials, project key, or try toggling the CORS Proxy.");
+    try {
+      await onConnect(config);
+    } catch (err: any) {
+      setError(err.message || "Connection failed. Please check your credentials and internet connection.");
     }
   };
 
@@ -40,8 +41,8 @@ export const JiraConnect: React.FC<JiraConnectProps> = ({ onConnect, isLoading, 
 
       <form onSubmit={handleSubmit} className="p-6 space-y-4">
         {error && (
-          <div className="p-3 bg-red-50 text-red-600 text-sm rounded-lg border border-red-100">
-            {error}
+          <div className="p-3 bg-red-50 text-red-600 text-sm rounded-lg border border-red-100 break-words">
+            <span className="font-bold">Error:</span> {error}
           </div>
         )}
 
@@ -124,8 +125,7 @@ export const JiraConnect: React.FC<JiraConnectProps> = ({ onConnect, isLoading, 
                 <span className="text-sm font-medium text-blue-900">Use CORS Proxy</span>
               </div>
               <p className="text-xs text-blue-700 mt-1">
-                Required for browser-only connections. Routes requests via a public proxy (corsproxy.io). 
-                Disable if you use a browser extension or VPN.
+                Required for browser-only connections. If you use a browser extension (e.g. "Allow CORS") or a local proxy, uncheck this.
               </p>
             </div>
           </label>
