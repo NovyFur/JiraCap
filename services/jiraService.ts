@@ -68,8 +68,7 @@ export class JiraService {
     }
 
     // Proxy fallback strategy
-    // 1. corsproxy.io
-    // 2. thingproxy
+    // Note: Some proxies don't handle POST bodies well, but these usually do.
     const proxies = [
       (u: string) => `https://corsproxy.io/?${encodeURIComponent(u)}`,
       (u: string) => `https://thingproxy.freeboard.io/fetch/${u}`
@@ -95,14 +94,17 @@ export class JiraService {
 
   async validateConnection(): Promise<boolean> {
     try {
-      // Use V2 for broader compatibility
-      const response = await this.fetchFromJira('/rest/api/2/myself');
+      // Use v3/myself which is standard
+      const response = await this.fetchFromJira('/rest/api/3/myself');
       
       if (!response.ok) {
         if (response.status === 401) throw new Error("Unauthorized: Invalid email or API token.");
         if (response.status === 404) throw new Error("Not Found: Check your Jira Domain URL.");
         if (response.status === 403) throw new Error("Forbidden: You may not have permission to access this Jira instance.");
-        throw new Error(`Jira Error (${response.status}): ${response.statusText}`);
+        
+        // Attempt to read error message from body
+        const errText = await response.text();
+        throw new Error(`Jira Error (${response.status}): ${errText || response.statusText}`);
       }
       return true;
     } catch (e: any) {
@@ -113,16 +115,14 @@ export class JiraService {
   }
 
   async getProjectDetails() {
-    // Use V2
-    const response = await this.fetchFromJira(`/rest/api/2/project/${this.config.projectKey}`);
+    const response = await this.fetchFromJira(`/rest/api/3/project/${this.config.projectKey}`);
     if (!response.ok) throw new Error(`Failed to fetch project: ${response.statusText}`);
     return response.json();
   }
 
   async getTeamMembers(): Promise<TeamMember[]> {
-    // Use V2
     const response = await this.fetchFromJira(
-      `/rest/api/2/user/assignable/search?project=${this.config.projectKey}`
+      `/rest/api/3/user/assignable/search?project=${this.config.projectKey}`
     );
     
     if (!response.ok) throw new Error(`Failed to fetch users: ${response.statusText}`);
@@ -132,8 +132,7 @@ export class JiraService {
   }
 
   async getSprints(): Promise<Sprint[]> {
-    // First we need to find the board for the project.
-    // Agile API 1.0 is standard and stable
+    // Agile API 1.0 is stable
     const boardResp = await this.fetchFromJira(
       `/rest/agile/1.0/board?projectKeyOrId=${this.config.projectKey}`
     );
@@ -157,25 +156,23 @@ export class JiraService {
   }
 
   async getIssues(): Promise<JiraIssue[]> {
-    const jql = `project = ${this.config.projectKey} AND statusCategory != Done ORDER BY rank`;
+    const jql = `project = "${this.config.projectKey}" AND statusCategory != Done ORDER BY rank`;
     
-    // Use GET /rest/api/2/search
-    // Why? 
-    // 1. V3 GET is deprecated/removed.
-    // 2. V3 POST often fails with proxies that convert POST->GET or strip bodies.
-    // 3. V2 GET is stable and proxy-friendly.
-    const fields = ['summary', 'status', 'priority', 'issuetype', 'assignee', 'customfield_10016', 'sprint'];
-    const params = new URLSearchParams({
+    // MANDATORY FIX: Use POST /rest/api/3/search
+    // GET /rest/api/3/search is deprecated/removed.
+    const response = await this.fetchFromJira('/rest/api/3/search', {
+      method: 'POST',
+      body: JSON.stringify({
         jql,
-        maxResults: '100',
-        fields: fields.join(',')
+        maxResults: 100,
+        fields: ['summary', 'status', 'priority', 'issuetype', 'assignee', 'customfield_10016', 'sprint']
+      })
     });
 
-    const response = await this.fetchFromJira(`/rest/api/2/search?${params.toString()}`, {
-        method: 'GET'
-    });
-
-    if (!response.ok) throw new Error(`Failed to fetch issues: ${response.statusText}`);
+    if (!response.ok) {
+       const errText = await response.text();
+       throw new Error(`Failed to fetch issues (${response.status}): ${errText}`);
+    }
     const data = await response.json();
 
     return JiraService.parseIssuesFromRaw(data);
