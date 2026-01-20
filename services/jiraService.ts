@@ -95,7 +95,8 @@ export class JiraService {
 
   async validateConnection(): Promise<boolean> {
     try {
-      const response = await this.fetchFromJira('/rest/api/3/myself');
+      // Use V2 for broader compatibility
+      const response = await this.fetchFromJira('/rest/api/2/myself');
       
       if (!response.ok) {
         if (response.status === 401) throw new Error("Unauthorized: Invalid email or API token.");
@@ -112,14 +113,16 @@ export class JiraService {
   }
 
   async getProjectDetails() {
-    const response = await this.fetchFromJira(`/rest/api/3/project/${this.config.projectKey}`);
+    // Use V2
+    const response = await this.fetchFromJira(`/rest/api/2/project/${this.config.projectKey}`);
     if (!response.ok) throw new Error(`Failed to fetch project: ${response.statusText}`);
     return response.json();
   }
 
   async getTeamMembers(): Promise<TeamMember[]> {
+    // Use V2
     const response = await this.fetchFromJira(
-      `/rest/api/3/user/assignable/search?project=${this.config.projectKey}`
+      `/rest/api/2/user/assignable/search?project=${this.config.projectKey}`
     );
     
     if (!response.ok) throw new Error(`Failed to fetch users: ${response.statusText}`);
@@ -130,6 +133,7 @@ export class JiraService {
 
   async getSprints(): Promise<Sprint[]> {
     // First we need to find the board for the project.
+    // Agile API 1.0 is standard and stable
     const boardResp = await this.fetchFromJira(
       `/rest/agile/1.0/board?projectKeyOrId=${this.config.projectKey}`
     );
@@ -155,14 +159,20 @@ export class JiraService {
   async getIssues(): Promise<JiraIssue[]> {
     const jql = `project = ${this.config.projectKey} AND statusCategory != Done ORDER BY rank`;
     
-    // Use POST /search to avoid GET deprecations and URL length limits
-    const response = await this.fetchFromJira('/rest/api/3/search', {
-      method: 'POST',
-      body: JSON.stringify({
+    // Use GET /rest/api/2/search
+    // Why? 
+    // 1. V3 GET is deprecated/removed.
+    // 2. V3 POST often fails with proxies that convert POST->GET or strip bodies.
+    // 3. V2 GET is stable and proxy-friendly.
+    const fields = ['summary', 'status', 'priority', 'issuetype', 'assignee', 'customfield_10016', 'sprint'];
+    const params = new URLSearchParams({
         jql,
-        maxResults: 100,
-        fields: ['summary', 'status', 'priority', 'issuetype', 'assignee', 'customfield_10016', 'sprint']
-      })
+        maxResults: '100',
+        fields: fields.join(',')
+    });
+
+    const response = await this.fetchFromJira(`/rest/api/2/search?${params.toString()}`, {
+        method: 'GET'
     });
 
     if (!response.ok) throw new Error(`Failed to fetch issues: ${response.statusText}`);
